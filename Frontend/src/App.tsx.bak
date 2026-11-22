@@ -1,0 +1,187 @@
+import React, { useState, useEffect } from 'react';
+import { PortalWorkspace } from './PortalWorkspace';
+import { PORTAL_CONFIGS, PortalType } from '@ahub/shared';
+import { Navbar } from './components/Navbar';
+import { PortalDirectory } from './components/PortalDirectory';
+import { PortalLogin } from './auth/PortalLogin';
+import { PortalRegister } from './auth/PortalRegister';
+import { PortalActivate } from './auth/PortalActivate';
+
+export default function App() {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [activePortal, setActivePortal] = useState('');
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (path: string) => {
+    if (path.startsWith('/#')) {
+      const elementId = path.substring(2);
+      const elem = document.getElementById(elementId);
+      if (elem) {
+        elem.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+      window.history.pushState({}, '', path);
+      setCurrentPath('/');
+      window.setTimeout(() => document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth' }), 0);
+      return;
+    }
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+    window.scrollTo(0, 0);
+  };
+
+  const handleLoginSuccess = (portal: string) => {
+    setActivePortal(portal);
+    const config = PORTAL_CONFIGS[portal as PortalType];
+    navigate(config ? config.appPath : '/portals');
+  };
+
+  // Route Matching logic
+  // 1. Check if path is a portal login route
+  const loginPortalConfig = Object.values(PORTAL_CONFIGS).find((p) => p.loginPath === currentPath);
+  if (loginPortalConfig) {
+    return (
+      <PortalLogin
+        portal={loginPortalConfig.id as PortalType}
+        onSuccess={handleLoginSuccess}
+        onNavigate={navigate}
+      />
+    );
+  }
+
+  // Short, memorable entry point for sector staff.
+  if (currentPath === '/sector') {
+    return (
+      <PortalLogin
+        portal={PortalType.SECTOR}
+        onSuccess={handleLoginSuccess}
+        onNavigate={navigate}
+      />
+    );
+  }
+
+  // 2. Check if path is a portal registration route
+  const registerPortalConfig = Object.values(PORTAL_CONFIGS).find((p) => p.registerPath === currentPath);
+  if (registerPortalConfig) {
+    return (
+      <PortalRegister
+        portal={registerPortalConfig.id as PortalType}
+        onNavigate={navigate}
+      />
+    );
+  }
+
+  // 3. Check if path is a portal activation route
+  const activatePortalConfig = Object.values(PORTAL_CONFIGS).find((p) => p.activatePath === currentPath);
+  if (activatePortalConfig) {
+    return (
+      <PortalActivate
+        portal={activatePortalConfig.id as PortalType}
+        onNavigate={navigate}
+        onActivated={(portal: string) => {
+          setActivePortal(portal);
+          const config = PORTAL_CONFIGS[portal as PortalType];
+          navigate(config ? config.appPath : '/portals');
+        }}
+      />
+    );
+  }
+
+  // 4. Check if path is a portal app dashboard route
+  const appPortalConfig = Object.values(PORTAL_CONFIGS).find((p) => p.appPath === currentPath);
+  if (appPortalConfig) {
+    return (
+      <div>
+        <PortalWorkspace
+          portal={appPortalConfig.id}
+          onExit={() => navigate('/portals')}
+        />
+      </div>
+    );
+  }
+
+  // 5. Check if path is /portals directory
+  if (currentPath === '/portals') {
+    return (
+      <main className='min-h-screen bg-slate-50'>
+        <Navbar onNavigate={navigate} />
+        <div className='pt-20 px-4 max-w-7xl mx-auto'>
+          <PortalDirectory onNavigate={navigate} />
+        </div>
+      </main>
+    );
+  }
+
+  if (currentPath === '/get-started') {
+    return (
+      <main className="start-page">
+        <Navbar onNavigate={navigate} />
+        <section className="start-content">
+          <button className="back-link" onClick={() => navigate('/')}>← Back to home</button>
+          <span className="kicker">Create your AHub account</span>
+          <h1>How will you use AHub?</h1>
+          <p className="start-intro">Choose the account that fits you. You can start with a farmer or buyer account in just a few steps.</p>
+          <div className="start-choice-grid">
+            <article className="start-choice-card">
+              <span className="start-choice-icon" aria-hidden="true">🌾</span>
+              <h2>I’m a farmer</h2>
+              <p>Manage your farm, follow helpful local advice, and connect with buyers.</p>
+              <button className="primary-button dark" onClick={() => navigate('/register/farmer')}>Create farmer account <span aria-hidden="true">→</span></button>
+            </article>
+            <article className="start-choice-card">
+              <span className="start-choice-icon" aria-hidden="true">🛒</span>
+              <h2>I’m a buyer</h2>
+              <p>Find local produce and connect with farmers and suppliers.</p>
+              <button className="primary-button dark" onClick={() => navigate('/register/customer')}>Create buyer account <span aria-hidden="true">→</span></button>
+            </article>
+          </div>
+          <p className="staff-entry">Are you a sector agriculture or veterinary officer? <button onClick={() => navigate('/sector')}>Go to sector staff sign in →</button></p>
+        </section>
+      </main>
+    );
+  }
+
+  // Default Home / Landing Page
+  return (
+    <main className='landing-layout min-h-screen bg-slate-50'>
+      <Navbar onNavigate={navigate} />
+      <section className="landing-hero">
+        <div className="landing-hero-copy">
+          <span className="eyebrow"><span className="live-dot" /> Rwanda’s agriculture, connected</span>
+          <h1>Good things grow <em>together.</em></h1>
+          <p>AHub helps farmers grow with confidence and helps buyers find fresh produce from Rwanda’s communities.</p>
+          <div className="hero-actions">
+            <button className="primary-button" onClick={() => navigate('/get-started')}>Get started <span aria-hidden="true">→</span></button>
+            <button className="secondary-button" onClick={() => navigate('/#how-it-works')}>See how it works</button>
+          </div>
+          <div className="landing-proof"><span>🌱</span> Built for Rwanda’s farmers, buyers, and communities</div>
+        </div>
+        <div className="landing-visual" aria-label="AHub connects farmers with buyers">
+          <div className="visual-sun" />
+          <div className="visual-field field-back" />
+          <div className="visual-field field-front" />
+          <div className="visual-note"><span>🥬</span><div><strong>From farm to market</strong><small>Closer connections. Better opportunities.</small></div></div>
+        </div>
+      </section>
+      <section className="landing-benefits" id="how-it-works">
+        <div><span className="kicker">One simple place to begin</span><h2>Tools for the people who grow and move food.</h2></div>
+        <div className="benefit-points">
+          <article><span>01</span><h3>Grow with confidence</h3><p>Keep farm tasks, local guidance, and useful updates close at hand.</p></article>
+          <article><span>02</span><h3>Reach more buyers</h3><p>Make it easier for customers to discover what local farmers have to offer.</p></article>
+          <article><span>03</span><h3>Build local connections</h3><p>Bring farmers and buyers closer through a shared agriculture network.</p></article>
+        </div>
+      </section>
+      <section className="landing-bottom-cta">
+        <div><span className="kicker">Ready when you are</span><h2>Start with the account that fits you.</h2></div>
+        <button className="primary-button" onClick={() => navigate('/get-started')}>Choose your account →</button>
+      </section>
+    </main>
+  );
+}

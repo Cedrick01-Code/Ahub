@@ -1,0 +1,51 @@
+export const PORTAL_RULES = {
+  rab: {
+    label: 'RAB Admin',
+    parentPortal: 'nsg',
+    requiresApproval: true,
+    requiresMfa: true,
+    isOfficial: true,
+  },
+  province: {
+    label: 'Province Veterinary',
+    parentPortal: 'rab',
+    requiresApproval: true,
+    requiresMfa: true,
+    isOfficial: true,
+  },
+  district: {
+    label: 'District Veterinary',
+    parentPortal: 'province',
+    requiresApproval: true,
+    requiresMfa: true,
+    isOfficial: true,
+  },
+  sector: {
+    label: 'Sector Veterinary',
+    parentPortal: 'district',
+    requiresApproval: true,
+    requiresMfa: true,
+    isOfficial: true,
+  },
+  farmer: {
+    label: 'Farmer',
+    parentPortal: null,
+    requiresApproval: false,
+    requiresMfa: false,
+    isOfficial: false,
+  },
+  customer: {
+    label: 'Customer',
+    parentPortal: null,
+    requiresApproval: false,
+    requiresMfa: false,
+    isOfficial: false,
+  },
+  nsg: {
+    label: 'NSG Security Admin',
+    parentPortal: 'nsg',
+    requiresApproval: true,
+    requiresMfa: true,
+    isOfficial: true,
+  },
+};
