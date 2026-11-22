@@ -7,10 +7,33 @@ import app from './app.js';
 import { ExamAttempt } from './models/Learning.js';
 import { finalizeAttempt } from './routes/learning.js';
 import { startWhatsApp } from './services/whatsapp.js';
+import { Product } from './models/Operations.js';
 
 const startServer = async () => {
   try {
     await connectDB();
+
+    // Run cleanup of soldout products after DB connects
+    async function cleanupSoldoutProducts() {
+      try {
+        const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+        const result = await Product.deleteMany({
+          status: 'soldout',
+          soldoutAt: { $lt: fiveDaysAgo },
+        });
+        if (result.deletedCount > 0) {
+          console.log(`Auto-deleted ${result.deletedCount} soldout products older than 5 days`);
+        }
+      } catch (error) {
+        console.error('Cleanup soldout products failed:', error);
+      }
+    }
+
+    // Run cleanup once on startup
+    await cleanupSoldoutProducts();
+    // Run cleanup daily
+    setInterval(cleanupSoldoutProducts, 24 * 60 * 60 * 1000);
+
     startWhatsApp();
 
     const autoSubmitExpiredAttempts = async () => {

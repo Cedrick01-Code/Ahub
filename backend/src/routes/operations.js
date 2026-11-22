@@ -581,7 +581,4 @@ async function cleanupSoldoutProducts() {
 // Run cleanup every day at midnight
 setInterval(cleanupSoldoutProducts, 24 * 60 * 60 * 1000);
 
-// Run once on startup
-cleanupSoldoutProducts();
-
 export default router;
