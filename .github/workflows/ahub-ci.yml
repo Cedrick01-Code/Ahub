@@ -24,6 +24,7 @@ jobs:
           --health-retries 5
     env:
       JWT_SECRET: test-only-ci-secret-that-is-long-enough-32-chars
+      MFA_ENCRYPTION_KEY: test-only-mfa-encryption-key-that-is-long-enough
       MONGODB_URI: mongodb://127.0.0.1:27017/ahub_test
     steps:
       - uses: actions/checkout@v4

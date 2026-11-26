@@ -12,7 +12,13 @@ const decodeBase32 = (text) => {
   for (const char of String(text).toUpperCase().replace(/=+$/g, '')) { const digit = alphabet.indexOf(char); if (digit < 0) throw new Error('Invalid base32 secret.'); value = (value << 5) | digit; bits += 5; if (bits >= 8) { bytes.push((value >>> (bits - 8)) & 255); bits -= 8; } }
   return Buffer.from(bytes);
 };
-const encryptionKey = () => createHmac('sha256', process.env.MFA_ENCRYPTION_KEY || process.env.JWT_SECRET || 'ahub-dev-secret').update('ahub-totp-encryption').digest();
+const encryptionKey = () => {
+  const secret = process.env.MFA_ENCRYPTION_KEY;
+  if (!secret || secret.length < 32) {
+    throw new Error('MFA_ENCRYPTION_KEY must be configured with at least 32 characters.');
+  }
+  return createHmac('sha256', secret).update('ahub-totp-encryption').digest();
+};
 
 export const createTotpSecret = () => encodeBase32(randomBytes(20));
 export const encryptTotpSecret = (secret) => {
