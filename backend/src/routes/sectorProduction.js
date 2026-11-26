@@ -23,7 +23,7 @@ const auth = asyncRoute(async (req, res, next) => {
   if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A valid active session is required.' });
   try {
     const jwt = await import('jsonwebtoken');
-    const payload = jwt.default.verify(token, process.env.JWT_SECRET || 'ahub-dev-secret');
+    const payload = jwt.default.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(payload.sub);
     if (!user || user.status !== 'active' || Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) {
       return res.status(401).json({ message: 'A valid active session is required.' });
