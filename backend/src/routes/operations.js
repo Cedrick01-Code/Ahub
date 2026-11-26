@@ -317,7 +317,7 @@ router.post('/announcements', auth, roles('sector', 'district', 'province', 'rab
   const { title, body, priority = 'normal', status = 'draft' } = req.body;
   if (!title?.trim() || !body?.trim()) return res.status(400).json({ message: 'Announcement title and content are required.' });
   if (!['draft', 'published'].includes(status)) return res.status(400).json({ message: 'Invalid initial announcement status.' });
-  if (!['low', 'normal', 'high', 'urgent'].includes(priority)) return res.status(400).json({ message: 'Invalid announcement priority.' });
+  if (!['normal', 'high', 'urgent'].includes(priority)) return res.status(400).json({ message: 'Invalid announcement priority.' });
   
   const announcementData = {
     authorId: req.user._id,
