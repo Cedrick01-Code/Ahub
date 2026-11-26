@@ -13,48 +13,20 @@ import {
   ProductionExpense,
 } from '../models/ProductionUnit.js';
 import User from '../models/User.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const auth = asyncRoute(async (req, res, next) => {
-  const [scheme, token] = String(req.headers.authorization || '').split(' ');
-  if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A valid active session is required.' });
-  try {
-    const jwt = await import('jsonwebtoken');
-    const payload = jwt.default.verify(token, process.env.JWT_SECRET || 'ahub-dev-secret');
-    const user = await User.findById(payload.sub);
-    if (!user || user.status !== 'active' || Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) {
-      return res.status(401).json({ message: 'A valid active session is required.' });
-    }
-    req.user = user;
-    next();
-  } catch {
-    res.status(401).json({ message: 'A valid active session is required.' });
-  }
-});
+const auth = authenticate;
 
 const roles = (...allowed) => (req, res, next) => allowed.includes(req.user.portal) ? next() : res.status(403).json({ message: 'This portal cannot perform that action.' });
 
 const data = (res, value, status = 200) => res.status(status).json({ data: value });
 const hide = res => res.status(404).json({ message: 'Not found.' });
 
-const getSectorScope = (user) => {
-  if (user.portal === 'sector') return user.sector;
-  if (user.portal === 'district') return user.district;
-  if (user.portal === 'province') return user.province;
-  if (user.portal === 'rab') return null;
-  return user.sector;
-};
 
-const canAccessSector = (user, sector) => {
-  if (user.portal === 'rab') return true;
-  if (user.portal === 'province') return user.province === sector;
-  if (user.portal === 'district') return user.district === sector;
-  if (user.portal === 'sector') return user.sector === sector;
-  return false;
-};
 
 // ============================================
 // FARMER PRODUCTION UNIT ROUTES
@@ -121,9 +93,18 @@ router.post('/', auth, roles('farmer'), asyncRoute(async (req, res) => {
 
 // Update production unit (farmer owns it)
 router.patch('/:id', auth, roles('farmer'), asyncRoute(async (req, res) => {
+  const allowedFields = ['name', 'purpose', 'description', 'coverPhoto', 'photos', 'documents', 'plantData', 'livestockData'];
+  const updates = Object.fromEntries(
+    allowedFields.filter(field => Object.hasOwn(req.body || {}, field)).map(field => [field, req.body[field]])
+  );
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ message: 'No editable production fields were provided.' });
+  }
+  updates.updatedBy = req.user._id;
+
   const unit = await ProductionUnit.findOneAndUpdate(
     { _id: req.params.id, farmerId: req.user._id },
-    { ...req.body, updatedBy: req.user._id },
+    { $set: updates },
     { new: true, runValidators: true }
   );
   if (!unit) return hide(res);
