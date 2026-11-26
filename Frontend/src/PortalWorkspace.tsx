@@ -10,6 +10,7 @@ import { AIChat } from './components/AIChat';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { NotificationBell } from './components/NotificationBell';
+import { CommercePanels } from './portals/CommercePanels';
 
 interface Props { portal: string; onExit: () => void }
 type Row = Record<string, any>;
@@ -1327,6 +1328,8 @@ function FarmerPortal({ announce }: { announce: (message: string) => void }) {
           />
         </Panel>
 
+        <CommercePanels portal="farmer" announce={announce} />
+
         <Panel title="Report a farm problem" sectionId="report-a-farm-problem">
           <div className="mb-4">
             <button
@@ -1925,6 +1928,8 @@ function CustomerPortal({ announce }: { announce:(message:string)=>void }) {
         </Panel>
       )}
 
+      <CommercePanels portal="customer" announce={announce} />
+
       <Panel title='Your order conversations' sectionId='my-requests-and-messages'>
         <RecordList items={orders.items} loading={orders.loading} render={(o) => (
           <>
@@ -2031,6 +2036,7 @@ function StaffPortal({ portal, announce }: { portal: string; announce: (message:
 
   return (
     <div className="space-y-6">
+      <CommercePanels portal={portal} announce={announce} />
       {/* Executive Stat Bar */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:shadow-md">
@@ -2443,12 +2449,12 @@ function LearningResults({announce}:{announce:(m:string)=>void}){const [items,se
 function PortalNavigation({ portal, activePage, onNavigate }: { portal: string; activePage: string; onNavigate: (id: string) => void }) {
   const common = [{ label: 'Overview', id: portal === 'farmer' ? 'four-day-sector-forecast' : portal === 'customer' ? 'find-local-products' : `${portal}-overview`, icon: Home }];
   const entries: Record<string, {label:string;id:string;icon:typeof Home}[]> = {
-    farmer: [{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Plots',id:'register-a-plot',icon:MapPinned},{label:'Guide Me',id:'guide-me',icon:Sparkles},{label:'Tasks',id:'daily-tasks-submit-completed-work',icon:ClipboardCheck},{label:'Market',id:'upload-products',icon:Package},{label:'Orders',id:'orders-and-buyer-messages',icon:MessageSquare},{label:'Report issue',id:'report-a-farm-problem',icon:CircleAlert},{label:'Vet visit',id:'request-veterinary-visit',icon:Stethoscope},{label:'Updates',id:'announcements',icon:Megaphone},{label:'AI assistant',id:'agriculture-and-loan-assistant',icon:BookOpen}],
-    customer: [{label:'Browse',id:'find-local-products',icon:Search},{label:'Orders',id:'my-requests-and-messages',icon:MessageSquare}],
-    sector: [{label:'Overview',id:'sector-overview',icon:Activity},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Tasks',id:'daily-field-tasks',icon:ClipboardCheck},{label:'Vet requests',id:'vet-visit-requests',icon:Stethoscope},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-farmers-in-your-sector',icon:TrendingUp},{label:'Learning',id:'sector-learning',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone}],
-    district: [{label:'Overview',id:'district-overview',icon:Activity},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Crops & livestock',id:'crops-and-livestock-in-your-region',icon:Sprout},{label:'Tasks',id:'daily-field-tasks',icon:ClipboardCheck},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-performing-sectors',icon:TrendingUp},{label:'Learning',id:'sector-learning',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone},{label:'Account requests',id:'account-requests',icon:Users}],
-    province: [{label:'Overview',id:'province-overview',icon:Activity},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Crops & livestock',id:'crops-and-livestock-in-your-region',icon:Sprout},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-performing-districts',icon:TrendingUp},{label:'Learning',id:'sector-learning',icon:BookOpen},{label:'Exam results',id:'exam-results',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone},{label:'Account requests',id:'account-requests',icon:Users}],
-    rab: [{label:'Overview',id:'national-overview',icon:Activity},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Crops & livestock',id:'crops-and-livestock-in-your-region',icon:Sprout},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-performing-districts-nationwide',icon:TrendingUp},{label:'Exam results',id:'exam-results',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone},{label:'Course review',id:'rab-course-review',icon:BookOpen},{label:'Learning desk',id:'sector-learning',icon:BookOpen},{label:'Account requests',id:'account-requests',icon:Users}],
+    farmer: [{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Plots',id:'register-a-plot',icon:MapPinned},{label:'Guide Me',id:'guide-me',icon:Sparkles},{label:'Tasks',id:'daily-tasks-submit-completed-work',icon:ClipboardCheck},{label:'Market',id:'upload-products',icon:Package},{label:'Orders',id:'orders-and-buyer-messages',icon:MessageSquare},{label:'Messages',id:'independent-messages',icon:MessageSquare},{label:'Demand',id:'market-demand-requests',icon:Target},{label:'Prices',id:'official-market-prices',icon:TrendingUp},{label:'Delivery',id:'delivery-tracking',icon:Package},{label:'Report issue',id:'report-a-farm-problem',icon:CircleAlert},{label:'Vet visit',id:'request-veterinary-visit',icon:Stethoscope},{label:'Updates',id:'announcements',icon:Megaphone},{label:'AI assistant',id:'agriculture-and-loan-assistant',icon:BookOpen}],
+    customer: [{label:'Browse',id:'find-local-products',icon:Search},{label:'Orders',id:'my-requests-and-messages',icon:MessageSquare},{label:'Demand',id:'market-demand-requests',icon:Target},{label:'Messages',id:'independent-messages',icon:MessageSquare},{label:'Prices',id:'official-market-prices',icon:TrendingUp},{label:'Delivery',id:'delivery-tracking',icon:Package}],
+    sector: [{label:'Overview',id:'sector-overview',icon:Activity},{label:'Prices',id:'official-market-prices',icon:TrendingUp},{label:'Demand',id:'market-demand-requests',icon:Target},{label:'Messages',id:'independent-messages',icon:MessageSquare},{label:'Deliveries',id:'delivery-tracking',icon:Package},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Tasks',id:'daily-field-tasks',icon:ClipboardCheck},{label:'Vet requests',id:'vet-visit-requests',icon:Stethoscope},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-farmers-in-your-sector',icon:TrendingUp},{label:'Learning',id:'sector-learning',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone}],
+    district: [{label:'Overview',id:'district-overview',icon:Activity},{label:'Prices',id:'official-market-prices',icon:TrendingUp},{label:'Demand',id:'market-demand-requests',icon:Target},{label:'Messages',id:'independent-messages',icon:MessageSquare},{label:'Deliveries',id:'delivery-tracking',icon:Package},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Crops & livestock',id:'crops-and-livestock-in-your-region',icon:Sprout},{label:'Tasks',id:'daily-field-tasks',icon:ClipboardCheck},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-performing-sectors',icon:TrendingUp},{label:'Learning',id:'sector-learning',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone},{label:'Account requests',id:'account-requests',icon:Users}],
+    province: [{label:'Overview',id:'province-overview',icon:Activity},{label:'Prices',id:'official-market-prices',icon:TrendingUp},{label:'Demand',id:'market-demand-requests',icon:Target},{label:'Messages',id:'independent-messages',icon:MessageSquare},{label:'Deliveries',id:'delivery-tracking',icon:Package},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Crops & livestock',id:'crops-and-livestock-in-your-region',icon:Sprout},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-performing-districts',icon:TrendingUp},{label:'Learning',id:'sector-learning',icon:BookOpen},{label:'Exam results',id:'exam-results',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone},{label:'Account requests',id:'account-requests',icon:Users}],
+    rab: [{label:'Overview',id:'national-overview',icon:Activity},{label:'Official prices',id:'official-market-prices',icon:TrendingUp},{label:'Market demand',id:'market-demand-requests',icon:Target},{label:'Messages',id:'independent-messages',icon:MessageSquare},{label:'Deliveries',id:'delivery-tracking',icon:Package},{label:'Farmers',id:'farmers-in-your-jurisdiction',icon:Users},{label:'Crops & livestock',id:'crops-and-livestock-in-your-region',icon:Sprout},{label:'Problems',id:'reported-problems',icon:CircleAlert},{label:'Weather',id:'four-day-sector-forecast',icon:CloudSun},{label:'Rankings',id:'top-performing-districts-nationwide',icon:TrendingUp},{label:'Exam results',id:'exam-results',icon:BookOpen},{label:'Announcements',id:'publish-announcement',icon:Megaphone},{label:'Course review',id:'rab-course-review',icon:BookOpen},{label:'Learning desk',id:'sector-learning',icon:BookOpen},{label:'Account requests',id:'account-requests',icon:Users}],
     nsg: [{label:'Account requests',id:'account-requests',icon:Users}],
   };
   const links = entries[portal] || common;
@@ -2463,6 +2469,10 @@ function FarmerSidebar({ activePage, onNavigate }: { activePage: string; onNavig
     { label: 'Tasks', id: 'daily-tasks-submit-completed-work', icon: ClipboardCheck },
     { label: 'Market', id: 'upload-products', icon: Package },
     { label: 'Orders', id: 'orders-and-buyer-messages', icon: MessageSquare },
+    { label: 'Messages', id: 'independent-messages', icon: MessageSquare },
+    { label: 'Demand', id: 'market-demand-requests', icon: Target },
+    { label: 'Prices', id: 'official-market-prices', icon: TrendingUp },
+    { label: 'Delivery', id: 'delivery-tracking', icon: Package },
     { label: 'Report issue', id: 'report-a-farm-problem', icon: CircleAlert },
     { label: 'Vet visit', id: 'request-veterinary-visit', icon: Stethoscope },
     { label: 'Updates', id: 'announcements', icon: Megaphone },

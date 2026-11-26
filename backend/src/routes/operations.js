@@ -34,7 +34,7 @@ const handleMulterError = (err, req, res, next) => {
   }
   next();
 };
-const auth = asyncRoute(async (req, res, next) => { const [scheme, token] = String(req.headers.authorization || '').split(' '); if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A valid active session is required.' }); try { const payload = jwt.verify(token, process.env.JWT_SECRET || 'ahub-dev-secret'); const user = await User.findById(payload.sub); if (!user || user.status !== 'active' || Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) return res.status(401).json({ message: 'A valid active session is required.' }); req.user = user; next(); } catch { res.status(401).json({ message: 'A valid active session is required.' }); } });
+const auth = asyncRoute(async (req, res, next) => { const [scheme, token] = String(req.headers.authorization || '').split(' '); if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A valid active session is required.' }); try { const payload = jwt.verify(token, process.env.JWT_SECRET); const user = await User.findById(payload.sub); if (!user || user.status !== 'active' || Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) return res.status(401).json({ message: 'A valid active session is required.' }); req.user = user; next(); } catch { res.status(401).json({ message: 'A valid active session is required.' }); } });
 const roles = (...allowed) => (req, res, next) => allowed.includes(req.user.portal) ? next() : res.status(403).json({ message: 'This portal cannot perform that action.' });
 const data = (res, value, status = 200) => res.status(status).json({ data: value });
 const hide = res => res.status(404).json({ message: 'Not found.' });
