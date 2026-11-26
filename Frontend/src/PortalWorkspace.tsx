@@ -10,6 +10,7 @@ import { AIChat } from './components/AIChat';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { NotificationBell } from './components/NotificationBell';
+import { CommercePanels } from './portals/CommercePanels';
 
 interface Props { portal: string; onExit: () => void }
 type Row = Record<string, any>;
@@ -1327,6 +1328,8 @@ function FarmerPortal({ announce }: { announce: (message: string) => void }) {
           />
         </Panel>
 
+        <CommercePanels portal="farmer" announce={announce} />
+
         <Panel title="Report a farm problem" sectionId="report-a-farm-problem">
           <div className="mb-4">
             <button
@@ -1925,6 +1928,8 @@ function CustomerPortal({ announce }: { announce:(message:string)=>void }) {
         </Panel>
       )}
 
+      <CommercePanels portal="customer" announce={announce} />
+
       <Panel title='Your order conversations' sectionId='my-requests-and-messages'>
         <RecordList items={orders.items} loading={orders.loading} render={(o) => (
           <>
@@ -2031,6 +2036,7 @@ function StaffPortal({ portal, announce }: { portal: string; announce: (message:
 
   return (
     <div className="space-y-6">
+      <CommercePanels portal={portal} announce={announce} />
       {/* Executive Stat Bar */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:shadow-md">
