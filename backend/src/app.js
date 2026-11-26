@@ -8,6 +8,7 @@ import learningRoutes from './routes/learning.js';
 import operationsRoutes from './routes/operations.js';
 import productionUnitRoutes from './routes/productionUnits.js';
 import sectorProductionRoutes from './routes/sectorProduction.js';
+import governanceRoutes from './routes/governance.js';
 
 const app = express();
 app.use(cors());
@@ -33,4 +34,5 @@ app.use('/api/learning', learningRoutes);
 app.use('/api/operations', operationsRoutes);
 app.use('/api/production-units', productionUnitRoutes);
 app.use('/api/sector', sectorProductionRoutes);
+app.use('/api', governanceRoutes);
 export default app;
