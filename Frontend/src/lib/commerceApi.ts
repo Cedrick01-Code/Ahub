@@ -67,3 +67,5 @@ export type Delivery = {
   events: Array<{ status: string; note?: string; actorId: string; createdAt: string }>
 }
 export type DeliveryInput = { orderId: string; method?: Delivery["method"]; deliveryAddress?: string; estimatedAt?: string; notes?: string }
+
+export type Contact = { _id: string; fullName: string; portal: string; sector?: string; district?: string; province?: string }
