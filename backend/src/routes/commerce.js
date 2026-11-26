@@ -116,6 +116,25 @@ router.post('/conversations', auth, asyncRoute(async (req, res) => {
   if (!conversation) conversation = await Conversation.create({ participantIds: participants, contextType, contextId });
   res.status(201).json({ data: conversation });
 }));
+router.get('/directory', auth, asyncRoute(async (req, res) => {
+  const query = String(req.query.query || '').trim();
+  if (query.length < 2) return res.json({ data: [] });
+  const escaped = query.slice(0, 60).replace(/[.*+?^${}()|[\]\\]/g, '\\router.get('/conversations', auth, asyncRoute(async (req, res) => {');
+  const filter = { status: 'active', _id: { $ne: req.user._id }, fullName: new RegExp(escaped, 'i') };
+  if (req.user.portal === 'customer') filter.portal = 'farmer';
+  else if (req.user.portal === 'farmer') filter.portal = 'customer';
+  else if (['sector', 'district', 'province'].includes(req.user.portal)) {
+    filter.portal = 'farmer';
+    if (req.user.portal !== 'province') filter.district = req.user.district;
+    if (req.user.portal === 'sector') filter.sector = req.user.sector;
+    if (req.user.province) filter.province = req.user.province;
+  } else if (req.user.portal !== 'rab' && req.user.portal !== 'nsg') {
+    return res.status(403).json({ message: 'This portal cannot search the user directory.' });
+  }
+  const users = await User.find(filter).select('fullName portal sector district province').sort({ fullName: 1 }).limit(20).lean();
+  res.json({ data: users });
+}));
+
 router.get('/conversations', auth, asyncRoute(async (req, res) => {
   const rows = await Conversation.find({ participantIds: req.user._id, archivedFor: { $ne: req.user._id } }).populate('participantIds', 'fullName portal').sort({ lastMessageAt: -1 }).limit(100).lean();
   res.json({ data: rows });
