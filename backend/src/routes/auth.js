@@ -11,7 +11,10 @@ import { sendWhatsAppOtp, whatsappStatus } from '../services/whatsapp.js';
 
 const router = express.Router();
 
-const tokenSecret = process.env.JWT_SECRET || 'ahub-dev-secret';
+const tokenSecret = process.env.JWT_SECRET;
+if (!tokenSecret || tokenSecret.length < 32) {
+  throw new Error('JWT_SECRET must be configured with at least 32 characters before the auth routes are loaded.');
+}
 const tokenExpiry = process.env.JWT_EXPIRES_IN || '7d';
 
 const isOfficialRole = (portal) => !!PORTAL_RULES[portal] && PORTAL_RULES[portal].isOfficial;
