@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
+import { ProductionUnit } from '../models/ProductionUnit.js';
 import { VeterinaryCase, AuditEvent } from '../models/Governance.js';
 
 const router = express.Router();
@@ -61,7 +62,11 @@ router.post('/veterinary/cases', authenticate, asyncRoute(async (req, res) => {
   const { title, description, category, severity, productionUnitId, requestedVisitAt, attachments } = req.body || {};
   if (!String(title || '').trim() || !String(description || '').trim()) return res.status(400).json({ message: 'Title and description are required.' });
   if (!req.user.province || !req.user.district || !req.user.sector) return res.status(400).json({ message: 'Your account must have a complete province, district and sector before submitting a case.' });
-  if (productionUnitId && !safeId(productionUnitId)) return res.status(400).json({ message: 'Invalid production unit.' });
+  if (productionUnitId) {
+    if (!safeId(productionUnitId)) return res.status(400).json({ message: 'Invalid production unit.' });
+    const ownedUnit = await ProductionUnit.findOne({ _id: productionUnitId, farmerId: req.user._id, status: { $ne: 'archived' } }).select('_id');
+    if (!ownedUnit) return res.status(400).json({ message: 'The selected production unit does not belong to your account.' });
+  }
   const record = await VeterinaryCase.create({
     farmerId: req.user._id,
     productionUnitId: productionUnitId || null,
