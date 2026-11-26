@@ -582,7 +582,8 @@ async function cleanupSoldoutProducts() {
   }
 }
 
-// Run cleanup every day at midnight
-setInterval(cleanupSoldoutProducts, 24 * 60 * 60 * 1000);
+// Run cleanup every day at midnight without keeping test or shutdown processes alive.
+const soldoutCleanupTimer = setInterval(cleanupSoldoutProducts, 24 * 60 * 60 * 1000);
+soldoutCleanupTimer.unref?.();
 
 export default router;
