@@ -86,14 +86,15 @@ export function WorkflowCenter({ portal, announce }: { portal: string; announce:
 
   const submitCase = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await workflowsApi('/veterinary/cases', 'POST', {
         issueTitle: form.get('issueTitle'), description: form.get('description'),
         category: form.get('category'), urgency: form.get('urgency'),
         productionUnitId: form.get('productionUnitId') || undefined,
       });
-      event.currentTarget.reset();
+      formElement.reset();
       announce('Your veterinary case has been sent to the sector veterinary team.');
       await refresh();
     } catch (error) { announce(error instanceof Error ? error.message : 'Could not submit veterinary case.'); }
@@ -101,13 +102,14 @@ export function WorkflowCenter({ portal, announce }: { portal: string; announce:
 
   const startConversation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       const r = await workflowsApi<Envelope<Row>>('/conversations', 'POST', {
         recipientId: form.get('recipientId'), subject: form.get('subject'),
         firstMessage: form.get('firstMessage'), contextType: 'general',
       });
-      event.currentTarget.reset();
+      formElement.reset();
       announce('Conversation opened.');
       await refresh();
       await openConversation(r.data._id);
@@ -117,10 +119,11 @@ export function WorkflowCenter({ portal, announce }: { portal: string; announce:
   const sendMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedConversation) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await workflowsApi(`/conversations/${selectedConversation}/messages`, 'POST', { body: form.get('body') });
-      event.currentTarget.reset();
+      formElement.reset();
       await openConversation(selectedConversation);
       await refresh();
     } catch (error) { announce(error instanceof Error ? error.message : 'Message could not be sent.'); }
@@ -128,14 +131,15 @@ export function WorkflowCenter({ portal, announce }: { portal: string; announce:
 
   const submitPrice = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await workflowsApi('/prices', 'POST', {
         commodity: form.get('commodity'), grade: form.get('grade'), unit: form.get('unit'),
         priceRwf: Number(form.get('priceRwf')), effectiveFrom: form.get('effectiveFrom'),
         effectiveTo: form.get('effectiveTo') || undefined, status: 'published',
       });
-      event.currentTarget.reset();
+      formElement.reset();
       announce('Official price published.');
       await refresh();
     } catch (error) { announce(error instanceof Error ? error.message : 'Could not publish price.'); }
