@@ -26,8 +26,10 @@ const participant = (conversation, userId) => conversation.participantIds.some(i
 // Official prices: RAB publishes national or geographically scoped government prices.
 router.get('/prices', auth, asyncRoute(async (req, res) => {
   const filter = { status: 'published', effectiveFrom: { $lte: new Date() }, $or: [{ effectiveTo: null }, { effectiveTo: { $gte: new Date() } }] };
-  if (req.query.province) filter.$and = [...(filter.$and || []), { $or: [{ province: '' }, { province: req.query.province }] }];
-  if (req.query.district) filter.$and = [...(filter.$and || []), { $or: [{ district: '' }, { district: req.query.district }] }];
+  const provinceScope = ['farmer', 'customer', 'sector', 'district', 'province'].includes(req.user.portal) ? (req.user.province || '') : req.query.province;
+  const districtScope = ['farmer', 'customer', 'sector', 'district'].includes(req.user.portal) ? (req.user.district || '') : req.query.district;
+  if (provinceScope) filter.$and = [...(filter.$and || []), { $or: [{ province: '' }, { province: provinceScope }] }];
+  if (districtScope) filter.$and = [...(filter.$and || []), { $or: [{ district: '' }, { district: districtScope }] }];
   if (req.query.commodity) filter.commodity = new RegExp(String(req.query.commodity).slice(0, 80).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   const rows = await OfficialPrice.find(filter).sort({ commodity: 1, effectiveFrom: -1 }).limit(300).lean();
   res.json({ data: rows });
@@ -60,7 +62,10 @@ router.post('/market/demand-requests', auth, roles('customer'), asyncRoute(async
 router.get('/market/demand-requests', auth, asyncRoute(async (req, res) => {
   let filter;
   if (req.user.portal === 'customer') filter = { customerId: req.user._id };
-  else if (req.user.portal === 'farmer') filter = { status: 'open', ...(req.user.province ? { province: req.user.province } : {}), ...(req.user.district ? { district: req.user.district } : {}) };
+  else if (req.user.portal === 'farmer') {
+    if (!req.user.province || !req.user.district) return res.status(403).json({ message: 'Your account needs a province and district assignment to browse local demand.' });
+    filter = { status: 'open', province: req.user.province, district: req.user.district };
+  }
   else if (['sector', 'district', 'province', 'rab'].includes(req.user.portal)) {
     filter = {};
     if (req.user.portal !== 'rab') filter.province = req.user.province;
@@ -73,7 +78,8 @@ router.get('/market/demand-requests', auth, asyncRoute(async (req, res) => {
 }));
 router.post('/market/demand-requests/:id/respond', auth, roles('farmer'), asyncRoute(async (req, res) => {
   if (!validId(req.params.id)) return res.status(404).json({ message: 'Demand request not found.' });
-  const record = await DemandRequest.findOne({ _id: req.params.id, status: 'open', ...(req.user.province ? { province: req.user.province } : {}), ...(req.user.district ? { district: req.user.district } : {}) });
+  if (!req.user.province || !req.user.district) return res.status(403).json({ message: 'Your account needs a province and district assignment before responding to local demand.' });
+  const record = await DemandRequest.findOne({ _id: req.params.id, status: 'open', province: req.user.province, district: req.user.district });
   if (!record) return res.status(404).json({ message: 'Demand request not found.' });
   const { message, offeredQuantity, offeredPriceRwf, productId } = req.body || {};
   if (productId) {
