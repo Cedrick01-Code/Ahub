@@ -50,7 +50,7 @@ export function WorkflowCenter({ portal, announce }: { portal: string; announce:
     setBusy(false);
   }, [canViewDemand, canViewVet, canViewMessages, canViewPrices, canViewAudit, announce]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); }, [portal]);
 
   const openConversation = async (id: string) => {
     setSelectedConversation(id);
@@ -62,7 +62,8 @@ export function WorkflowCenter({ portal, announce }: { portal: string; announce:
 
   const submitDemand = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const location = {
       province: String(form.get('province') || userProfile.province || ''),
       district: String(form.get('district') || userProfile.district || ''),
@@ -77,7 +78,7 @@ export function WorkflowCenter({ portal, announce }: { portal: string; announce:
         budgetPerUnit: form.get('budgetPerUnit') ? Number(form.get('budgetPerUnit')) : undefined,
         requiredBy: form.get('requiredBy') || undefined, notes: form.get('notes'), location,
       });
-      event.currentTarget.reset();
+      formElement.reset();
       announce('Your demand request has been published to farmers in the selected area.');
       await refresh();
     } catch (error) { announce(error instanceof Error ? error.message : 'Could not create demand request.'); }
