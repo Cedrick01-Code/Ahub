@@ -2678,8 +2678,8 @@ export const PortalWorkspace: React.FC<Props> = ({ portal, onExit }) => {
             <PortalPageContext.Provider value={activePage}>
               {activePage === 'workflow-center' && <WorkflowCenter portal={portal} announce={announce} />}
               {portal === 'farmer' && <FarmerPortal announce={announce} />}
-              {portal === 'customer' && <CustomerPortal announce={announce} />}}
-              {['sector', 'district', 'province', 'rab'].includes(portal) && <StaffPortal portal={portal} announce={announce} />}}
+              {portal === 'customer' && <CustomerPortal announce={announce} />}
+              {['sector', 'district', 'province', 'rab'].includes(portal) && <StaffPortal portal={portal} announce={announce} />}
               {['sector', 'district', 'province', 'rab'].includes(portal) && activePage === 'sector-learning' && (
                 <FarmerLearning role="sector" announce={announce} />
               )}
