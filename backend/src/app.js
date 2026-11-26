@@ -9,6 +9,7 @@ import operationsRoutes from './routes/operations.js';
 import productionUnitRoutes from './routes/productionUnits.js';
 import sectorProductionRoutes from './routes/sectorProduction.js';
 import governanceRoutes from './routes/governance.js';
+import commerceRoutes from './routes/commerce.js';
 
 const app = express();
 app.use(cors());
@@ -35,4 +36,5 @@ app.use('/api/operations', operationsRoutes);
 app.use('/api/production-units', productionUnitRoutes);
 app.use('/api/sector', sectorProductionRoutes);
 app.use('/api', governanceRoutes);
+app.use('/api', commerceRoutes);
 export default app;
