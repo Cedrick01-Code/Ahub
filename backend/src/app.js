@@ -9,6 +9,7 @@ import operationsRoutes from './routes/operations.js';
 import productionUnitRoutes from './routes/productionUnits.js';
 import sectorProductionRoutes from './routes/sectorProduction.js';
 import governanceRoutes from './routes/governance.js';
+import workflowRoutes from './routes/workflows.js';
 
 const app = express();
 app.use(cors());
