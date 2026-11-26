@@ -119,7 +119,8 @@ router.post('/conversations', auth, asyncRoute(async (req, res) => {
 router.get('/directory', auth, asyncRoute(async (req, res) => {
   const query = String(req.query.query || '').trim();
   if (query.length < 2) return res.json({ data: [] });
-  const escaped = query.slice(0, 60).replace(/[.*+?^${}()|[\]\\]/g, '\\router.get('/conversations', auth, asyncRoute(async (req, res) => {');
+  const specialCharacters = '.*+?^${}()|[]' + String.fromCharCode(92);
+  const escaped = query.slice(0, 60).split('').map(char => specialCharacters.includes(char) ? String.fromCharCode(92) + char : char).join('');
   const filter = { status: 'active', _id: { $ne: req.user._id }, fullName: new RegExp(escaped, 'i') };
   if (req.user.portal === 'customer') filter.portal = 'farmer';
   else if (req.user.portal === 'farmer') filter.portal = 'customer';
