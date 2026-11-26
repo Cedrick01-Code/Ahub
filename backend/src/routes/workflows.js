@@ -4,13 +4,13 @@ import User from '../models/User.js';
 import { ProductionUnit } from '../models/ProductionUnit.js';
 import { Notification } from '../models/Operations.js';
 import {
-  AuditEvent,
+  WorkflowAuditEvent,
   Conversation,
   ConversationMessage,
   DemandRequest,
   OfficialPrice,
   VetVisitRequest,
-  VeterinaryCase,
+  WorkflowVeterinaryCase,
 } from '../models/Workflow.js';
 import { authenticate, allowPortals } from '../middleware/auth.js';
 import { canAccessRegion, buildRegionFilter } from '../utils/regionAccess.js';
@@ -41,7 +41,7 @@ const notifyRegionalVets = async (region, title, body, entityType, entityId) => 
 };
 
 const audit = (req, action, targetType, targetId, metadata = {}) =>
-  AuditEvent.create({
+  WorkflowAuditEvent.create({
     actorId: req.user?._id || null,
     actorPortal: req.user?.portal || '',
     action,
@@ -63,7 +63,7 @@ const caseVisibleTo = (user, item) =>
 
 const getCase = async id => {
   if (!validId(id)) return null;
-  return VeterinaryCase.findById(id);
+  return WorkflowVeterinaryCase.findById(id);
 };
 
 router.use(authenticate);
@@ -240,7 +240,7 @@ router.post('/veterinary/cases', allowPortals('farmer'), asyncRoute(async (req, 
     location = { ...unit.location.toObject(), province: unit.location.province, district: unit.location.district, sector: unit.location.sector };
   }
   if (!location.province || !location.district || !location.sector) return res.status(400).json({ message: 'Your account must have a complete region before reporting a problem.' });
-  const item = await VeterinaryCase.create({
+  const item = await WorkflowVeterinaryCase.create({
     farmerId: req.user._id,
     productionUnitId: productionUnitId || null,
     location,
@@ -250,7 +250,7 @@ router.post('/veterinary/cases', allowPortals('farmer'), asyncRoute(async (req, 
     urgency: ['low', 'normal', 'high', 'emergency'].includes(urgency) ? urgency : 'normal',
   });
   await Promise.all([
-    audit(req, 'veterinary.case.created', 'VeterinaryCase', item._id, { urgency: item.urgency }),
+    audit(req, 'veterinary.case.created', 'WorkflowVeterinaryCase', item._id, { urgency: item.urgency }),
     notifyRegionalVets(location, 'New veterinary case', `${item.issueTitle} (${item.urgency})`, 'veterinary_case', item._id),
   ]);
   data(res, item, 201);
@@ -262,7 +262,7 @@ router.get('/veterinary/cases', allowPortals('farmer', 'sector', 'district', 'pr
     : buildRegionFilter(req.user, 'location');
   if (req.query.status) filter.status = req.query.status;
   if (req.query.urgency) filter.urgency = req.query.urgency;
-  const items = await VeterinaryCase.find(filter).populate('farmerId', 'fullName phone').populate('assignedOfficerId', 'fullName portal').sort({ urgency: -1, createdAt: -1 }).limit(200).lean();
+  const items = await WorkflowVeterinaryCase.find(filter).populate('farmerId', 'fullName phone').populate('assignedOfficerId', 'fullName portal').sort({ urgency: -1, createdAt: -1 }).limit(200).lean();
   data(res, items);
 }));
 
@@ -290,7 +290,7 @@ router.patch('/veterinary/cases/:id', allowPortals('sector', 'district', 'provin
   if (item.status === 'resolved') item.resolvedAt = new Date();
   await item.save();
   await Promise.all([
-    audit(req, 'veterinary.case.updated', 'VeterinaryCase', item._id, { status: item.status, assignedOfficerId: item.assignedOfficerId }),
+    audit(req, 'veterinary.case.updated', 'WorkflowVeterinaryCase', item._id, { status: item.status, assignedOfficerId: item.assignedOfficerId }),
     notifyUser(item.farmerId, 'Veterinary case updated', `Your case “${item.issueTitle}” is now ${item.status}.`, 'veterinary_case', item._id),
   ]);
   data(res, item);
@@ -319,8 +319,8 @@ router.post('/veterinary/cases/:id/visits', allowPortals('farmer'), asyncRoute(a
 
 router.get('/veterinary/visits', allowPortals('farmer', 'sector', 'district', 'province', 'rab'), asyncRoute(async (req, res) => {
   let caseIds;
-  if (req.user.portal === 'farmer') caseIds = await VeterinaryCase.find({ farmerId: req.user._id }).distinct('_id');
-  else caseIds = await VeterinaryCase.find(buildRegionFilter(req.user, 'location')).distinct('_id');
+  if (req.user.portal === 'farmer') caseIds = await WorkflowVeterinaryCase.find({ farmerId: req.user._id }).distinct('_id');
+  else caseIds = await WorkflowVeterinaryCase.find(buildRegionFilter(req.user, 'location')).distinct('_id');
   const visits = await VetVisitRequest.find({ caseId: { $in: caseIds } })
     .populate('caseId')
     .populate('farmerId', 'fullName phone')
@@ -413,8 +413,8 @@ router.get('/audit/events', allowPortals('nsg', 'rab'), asyncRoute(async (req, r
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
   const [items, total] = await Promise.all([
-    AuditEvent.find(filter).populate('actorId', 'fullName portal').sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean(),
-    AuditEvent.countDocuments(filter),
+    WorkflowAuditEvent.find(filter).populate('actorId', 'fullName portal').sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean(),
+    WorkflowAuditEvent.countDocuments(filter),
   ]);
   data(res, { items, total, page: safePage, pages: Math.ceil(total / safeLimit) });
 }));

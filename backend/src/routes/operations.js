@@ -1,5 +1,6 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
+import { authenticate } from '../middleware/auth.js';
+import { canAccessRegion } from '../utils/regionAccess.js';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import User from '../models/User.js';
@@ -34,13 +35,32 @@ const handleMulterError = (err, req, res, next) => {
   }
   next();
 };
-const auth = asyncRoute(async (req, res, next) => { const [scheme, token] = String(req.headers.authorization || '').split(' '); if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A valid active session is required.' }); try { const payload = jwt.verify(token, process.env.JWT_SECRET || 'ahub-dev-secret'); const user = await User.findById(payload.sub); if (!user || user.status !== 'active' || Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) return res.status(401).json({ message: 'A valid active session is required.' }); req.user = user; next(); } catch { res.status(401).json({ message: 'A valid active session is required.' }); } });
+const auth = authenticate;
 const roles = (...allowed) => (req, res, next) => allowed.includes(req.user.portal) ? next() : res.status(403).json({ message: 'This portal cannot perform that action.' });
 const data = (res, value, status = 200) => res.status(status).json({ data: value });
 const hide = res => res.status(404).json({ message: 'Not found.' });
 const sector = user => user.sector || user.regionScope;
 const earthDistance = (lat1, lon1, lat2, lon2) => { const radians = value => value * Math.PI / 180; const dLat = radians(lat2 - lat1); const dLon = radians(lon2 - lon1); const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLon / 2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); };
 const scopedFarmerIds = async user => { const filter = { portal: 'farmer', status: 'active' }; if (user.portal === 'sector') filter.sector = sector(user); if (user.portal === 'district') filter.district = user.district; if (user.portal === 'province') filter.province = user.province; return User.find(filter).distinct('_id'); };
+const isStaffPortal = user => ['sector', 'district', 'province', 'rab'].includes(user?.portal);
+const canViewAnnouncement = (user, announcement) => {
+  if (String(announcement.authorId?._id || announcement.authorId) === String(user._id)) return true;
+  if (announcement.status !== 'published') return false;
+  if (user.portal === 'nsg') return false;
+  if (isStaffPortal(user)) {
+    if (announcement.level === 'national') return true;
+    return canAccessRegion(user, announcement);
+  }
+  if (announcement.level === 'national') return true;
+  if (announcement.level === 'province') return Boolean(user.province) && user.province === announcement.province;
+  if (announcement.level === 'district') return Boolean(user.district) && user.district === announcement.district && (!user.province || user.province === announcement.province);
+  if (announcement.level === 'local') return Boolean(user.sector) && user.sector === announcement.sector && (!user.district || user.district === announcement.district) && (!user.province || user.province === announcement.province);
+  return false;
+};
+const canManageAnnouncement = (user, announcement) =>
+  String(announcement.authorId) === String(user._id) ||
+  (isStaffPortal(user) && (announcement.level === 'national' ? user.portal === 'rab' : canAccessRegion(user, announcement)));
+
 const notify = (userId, title, body, entityType, entityId) => Notification.create({ userId, title, body, entityType, entityId });
 const notifySector = async (sectorName, title, body, entityType, entityId) => { const vets = await User.find({ portal: 'sector', status: 'active', $or: [{ sector: sectorName }, { regionScope: sectorName }] }).distinct('_id'); if (vets.length) await Notification.insertMany(vets.map(userId => ({ userId, title, body, entityType, entityId }))); };
 const isTimeoutError = error => [408, 504].includes(Number(error?.status)) || error?.name === 'TimeoutError' || error?.name === 'AbortError' || /timed? ?out|timeout|deadline exceeded|operation was aborted/i.test(error?.message || '') || ['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'ECONNABORTED'].includes(error?.cause?.code);
@@ -259,48 +279,36 @@ router.get('/announcements', auth, asyncRoute(async (req, res) => {
   const u = req.user;
   const { status, level, search, page = 1, limit = 20 } = req.query;
   const filter = {};
-  
-  // Role-based visibility
-  if (['sector', 'district', 'province', 'rab'].includes(u.portal)) {
-    // Staff can see all announcements in their scope
-    const clauses = [{ level: 'national' }];
-    if (u.province) clauses.push({ level: 'province', province: u.province });
-    if (u.district) clauses.push({ level: 'district', district: u.district });
-    if (u.sector) clauses.push({ level: 'local', sector: u.sector });
+  const clauses = [];
+
+  if (u.portal === 'nsg') {
+    filter.authorId = u._id;
+  } else if (isStaffPortal(u)) {
+    clauses.push({ level: 'national' });
+    if (u.portal === 'province' && u.province) clauses.push({ province: u.province, level: { $in: ['province', 'district', 'local'] } });
+    if (u.portal === 'district' && u.district) clauses.push({ district: u.district, level: { $in: ['district', 'local'] } });
+    if (u.portal === 'sector' && u.sector) clauses.push({ sector: u.sector, level: 'local' });
+    clauses.push({ authorId: u._id });
     filter.$or = clauses;
-    
-    // Staff can also see their own drafts
-    if (u.portal !== 'farmer' && u.portal !== 'customer') {
-      filter.$or = [...filter.$or, { authorId: u._id }];
-    }
   } else {
-    // Farmers and customers only see published announcements in their scope
-    const clauses = [{ level: 'national' }];
-    if (u.province) clauses.push({ level: 'province', province: u.province });
-    if (u.district) clauses.push({ level: 'district', district: u.district });
-    if (u.sector) clauses.push({ level: 'local', sector: u.sector });
+    clauses.push({ level: 'national', status: 'published' });
+    if (u.province) clauses.push({ level: 'province', province: u.province, status: 'published' });
+    if (u.district) clauses.push({ level: 'district', district: u.district, status: 'published', ...(u.province ? { province: u.province } : {}) });
+    if (u.sector) clauses.push({ level: 'local', sector: u.sector, status: 'published', ...(u.district ? { district: u.district } : {}), ...(u.province ? { province: u.province } : {}) });
     filter.$or = clauses;
-    filter.status = 'published';
   }
 
-  if (status) filter.status = status;
+  if (status && isStaffPortal(u)) filter.status = status;
   if (level) filter.level = level;
-  if (search) {
-    filter.$text = { $search: String(search) };
-  }
+  if (search) filter.$text = { $search: String(search) };
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
   const [items, total] = await Promise.all([
-    Announcement.find(filter)
-      .populate('authorId', 'fullName portal')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
-      .lean(),
-    Announcement.countDocuments(filter)
+    Announcement.find(filter).populate('authorId', 'fullName portal').sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean(),
+    Announcement.countDocuments(filter),
   ]);
-
-  data(res, { items, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+  data(res, { items, total, page: safePage, pages: Math.ceil(total / safeLimit) });
 }));
 
 router.post('/announcements', auth, roles('sector', 'district', 'province', 'rab'), asyncRoute(async (req, res) => {
@@ -308,6 +316,8 @@ router.post('/announcements', auth, roles('sector', 'district', 'province', 'rab
   const level = levelByRole[req.user.portal];
   const { title, body, priority = 'normal', status = 'draft' } = req.body;
   if (!title?.trim() || !body?.trim()) return res.status(400).json({ message: 'Announcement title and content are required.' });
+  if (!['draft', 'published'].includes(status)) return res.status(400).json({ message: 'Invalid initial announcement status.' });
+  if (!['normal', 'high', 'urgent'].includes(priority)) return res.status(400).json({ message: 'Invalid announcement priority.' });
   
   const announcementData = {
     authorId: req.user._id,
@@ -330,15 +340,7 @@ router.post('/announcements', auth, roles('sector', 'district', 'province', 'rab
 
 router.get('/announcements/:id', auth, asyncRoute(async (req, res) => {
   const announcement = await Announcement.findById(req.params.id).populate('authorId', 'fullName portal').lean();
-  if (!announcement) return hide(res);
-  
-  // Check visibility
-  const u = req.user;
-  const canView = announcement.status === 'published' || 
-    announcement.authorId._id.toString() === u._id.toString() ||
-    ['sector', 'district', 'province', 'rab'].includes(u.portal);
-  
-  if (!canView) return hide(res);
+  if (!announcement || !canViewAnnouncement(req.user, announcement)) return hide(res);
   data(res, announcement);
 }));
 
@@ -347,10 +349,9 @@ router.patch('/announcements/:id', auth, roles('sector', 'district', 'province',
   if (!announcement) return hide(res);
   
   // Only author or higher authority can edit
-  const isAuthor = announcement.authorId.toString() === req.user._id.toString();
-  const canEdit = isAuthor || ['district', 'province', 'rab'].includes(req.user.portal);
-  
-  if (!canEdit) return res.status(403).json({ message: 'You can only edit your own announcements.' });
+  if (!canManageAnnouncement(req.user, announcement)) {
+    return res.status(403).json({ message: 'You can only manage announcements authored by you or within your assigned region.' });
+  }
   
   const { title, body, priority, status } = req.body;
   const updates = {};
@@ -361,6 +362,12 @@ router.patch('/announcements/:id', auth, roles('sector', 'district', 'province',
   // Level is auto-derived from user's portal role and cannot be changed
   
   // Handle status changes
+  if (status && !['draft', 'published', 'archived'].includes(status)) {
+    return res.status(400).json({ message: 'Invalid announcement status.' });
+  }
+  if (priority && !['normal', 'high', 'urgent'].includes(priority)) {
+    return res.status(400).json({ message: 'Invalid announcement priority.' });
+  }
   if (status && status !== announcement.status) {
     updates.status = status;
     if (status === 'published' && !announcement.publishedAt) {
@@ -379,10 +386,9 @@ router.delete('/announcements/:id', auth, roles('sector', 'district', 'province'
   const announcement = await Announcement.findById(req.params.id);
   if (!announcement) return hide(res);
   
-  const isAuthor = announcement.authorId.toString() === req.user._id.toString();
-  const canDelete = isAuthor || ['district', 'province', 'rab'].includes(req.user.portal);
-  
-  if (!canDelete) return res.status(403).json({ message: 'You can only delete your own announcements.' });
+  if (!canManageAnnouncement(req.user, announcement)) {
+    return res.status(403).json({ message: 'You can only manage announcements authored by you or within your assigned region.' });
+  }
   
   await Announcement.findByIdAndDelete(req.params.id);
   data(res, { deleted: true });
@@ -392,10 +398,9 @@ router.post('/announcements/:id/publish', auth, roles('sector', 'district', 'pro
   const announcement = await Announcement.findById(req.params.id);
   if (!announcement) return hide(res);
   
-  const isAuthor = announcement.authorId.toString() === req.user._id.toString();
-  const canPublish = isAuthor || ['district', 'province', 'rab'].includes(req.user.portal);
-  
-  if (!canPublish) return res.status(403).json({ message: 'You can only publish your own announcements.' });
+  if (!canManageAnnouncement(req.user, announcement)) {
+    return res.status(403).json({ message: 'You can only manage announcements authored by you or within your assigned region.' });
+  }
   
   announcement.status = 'published';
   announcement.publishedAt = new Date();
@@ -410,10 +415,9 @@ router.post('/announcements/:id/archive', auth, roles('sector', 'district', 'pro
   const announcement = await Announcement.findById(req.params.id);
   if (!announcement) return hide(res);
   
-  const isAuthor = announcement.authorId.toString() === req.user._id.toString();
-  const canArchive = isAuthor || ['district', 'province', 'rab'].includes(req.user.portal);
-  
-  if (!canArchive) return res.status(403).json({ message: 'You can only archive your own announcements.' });
+  if (!canManageAnnouncement(req.user, announcement)) {
+    return res.status(403).json({ message: 'You can only manage announcements authored by you or within your assigned region.' });
+  }
   
   announcement.status = 'archived';
   announcement.archivedAt = new Date();
@@ -578,7 +582,8 @@ async function cleanupSoldoutProducts() {
   }
 }
 
-// Run cleanup every day at midnight
-setInterval(cleanupSoldoutProducts, 24 * 60 * 60 * 1000);
+// Run cleanup every day at midnight without keeping test or shutdown processes alive.
+const soldoutCleanupTimer = setInterval(cleanupSoldoutProducts, 24 * 60 * 60 * 1000);
+soldoutCleanupTimer.unref?.();
 
 export default router;

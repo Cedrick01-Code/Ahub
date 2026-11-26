@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 npm-debug.log*
 .wwebjs_auth/
+
+# Local and deployment secrets
+.env.*
+!.env.example

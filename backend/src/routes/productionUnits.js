@@ -13,27 +13,13 @@ import {
   ProductionExpense,
 } from '../models/ProductionUnit.js';
 import User from '../models/User.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const auth = asyncRoute(async (req, res, next) => {
-  const [scheme, token] = String(req.headers.authorization || '').split(' ');
-  if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A valid active session is required.' });
-  try {
-    const jwt = await import('jsonwebtoken');
-    const payload = jwt.default.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(payload.sub);
-    if (!user || user.status !== 'active' || Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) {
-      return res.status(401).json({ message: 'A valid active session is required.' });
-    }
-    req.user = user;
-    next();
-  } catch {
-    res.status(401).json({ message: 'A valid active session is required.' });
-  }
-});
+const auth = authenticate;
 
 const roles = (...allowed) => (req, res, next) => allowed.includes(req.user.portal) ? next() : res.status(403).json({ message: 'This portal cannot perform that action.' });
 
@@ -121,35 +107,13 @@ router.post('/', auth, roles('farmer'), asyncRoute(async (req, res) => {
 
 // Update production unit (farmer owns it)
 router.patch('/:id', auth, roles('farmer'), asyncRoute(async (req, res) => {
-  const allowedFields = ['name', 'purpose', 'plantData', 'livestockData', 'description', 'coverPhoto', 'photos', 'documents'];
-  const updates = {};
-  for (const field of allowedFields) {
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, field)) updates[field] = req.body[field];
-  }
-
-  // Geographic ownership is immutable: farmers may edit their village/cell and GPS,
-  // but cannot move a unit into another sector, district, or province.
-  if (req.body?.location && typeof req.body.location === 'object') {
-    updates.location = {
-      village: req.body.location.village,
-      cell: req.body.location.cell,
-      gpsCoordinates: req.body.location.gpsCoordinates,
-      sector: req.user.sector,
-      district: req.user.district,
-      province: req.user.province,
-    };
-    if (updates.location.village === undefined || updates.location.cell === undefined) {
-      return res.status(400).json({ message: 'Village and cell are required when updating a production location.' });
-    }
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ message: 'No editable production fields were supplied.' });
-  }
-
+  const allowedFields = ['name', 'purpose', 'description', 'coverPhoto', 'photos', 'documents', 'plantData', 'livestockData'];
+  const updates = Object.fromEntries(allowedFields.filter(field => Object.hasOwn(req.body || {}, field)).map(field => [field, req.body[field]]));
+  if (!Object.keys(updates).length) return res.status(400).json({ message: 'No editable production fields were provided.' });
+  updates.updatedBy = req.user._id;
   const unit = await ProductionUnit.findOneAndUpdate(
     { _id: req.params.id, farmerId: req.user._id },
-    { $set: { ...updates, updatedBy: req.user._id } },
+    { $set: updates },
     { new: true, runValidators: true }
   );
   if (!unit) return hide(res);
