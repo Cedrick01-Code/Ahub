@@ -36,4 +36,5 @@ app.use('/api/operations', operationsRoutes);
 app.use('/api/production-units', productionUnitRoutes);
 app.use('/api/sector', sectorProductionRoutes);
 app.use('/api', governanceRoutes);
+app.use('/api/workflows', workflowRoutes);
 export default app;
