@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import { OfficialPrice, DemandRequest, Conversation, Message, Delivery } from '../models/Commerce.js';
-import { Order } from '../models/Operations.js';
+import { Order, Product } from '../models/Operations.js';
 
 const router = express.Router();
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -34,7 +34,9 @@ router.get('/prices', auth, asyncRoute(async (req, res) => {
 }));
 router.post('/prices', auth, roles('rab'), asyncRoute(async (req, res) => {
   const { commodity, category, unit, priceRwf, province, district, effectiveFrom, effectiveTo, notes, status } = req.body || {};
-  if (!String(commodity || '').trim() || !String(unit || '').trim() || !Number.isFinite(Number(priceRwf)) || Number(priceRwf) < 0 || !effectiveFrom) return res.status(400).json({ message: 'Commodity, unit, non-negative price and effective date are required.' });
+  const start = new Date(effectiveFrom);
+  const end = effectiveTo ? new Date(effectiveTo) : null;
+  if (!String(commodity || '').trim() || !String(unit || '').trim() || !Number.isFinite(Number(priceRwf)) || Number(priceRwf) < 0 || !effectiveFrom || Number.isNaN(start.getTime()) || (end && (Number.isNaN(end.getTime()) || end <= start))) return res.status(400).json({ message: 'Commodity, unit, non-negative price and a valid effective date range are required.' });
   const row = await OfficialPrice.create({ commodity: String(commodity).trim(), category, unit: String(unit).trim(), priceRwf: Number(priceRwf), province: String(province || '').trim(), district: String(district || '').trim(), effectiveFrom, effectiveTo: effectiveTo || null, notes: String(notes || '').slice(0, 2000), status: status === 'published' ? 'published' : 'draft', createdBy: req.user._id });
   res.status(201).json({ data: row });
 }));
@@ -74,7 +76,13 @@ router.post('/market/demand-requests/:id/respond', auth, roles('farmer'), asyncR
   const record = await DemandRequest.findOne({ _id: req.params.id, status: 'open', ...(req.user.province ? { province: req.user.province } : {}), ...(req.user.district ? { district: req.user.district } : {}) });
   if (!record) return res.status(404).json({ message: 'Demand request not found.' });
   const { message, offeredQuantity, offeredPriceRwf, productId } = req.body || {};
-  if (productId && !validId(productId)) return res.status(400).json({ message: 'Invalid product.' });
+  if (productId) {
+    if (!validId(productId)) return res.status(400).json({ message: 'Invalid product.' });
+    const product = await Product.findOne({ _id: productId, farmerId: req.user._id, status: 'available' }).select('_id');
+    if (!product) return res.status(400).json({ message: 'The selected product is not an active listing owned by your account.' });
+  }
+  if (offeredQuantity !== undefined && (!Number.isFinite(Number(offeredQuantity)) || Number(offeredQuantity) <= 0)) return res.status(400).json({ message: 'Offered quantity must be positive.' });
+  if (offeredPriceRwf !== undefined && (!Number.isFinite(Number(offeredPriceRwf)) || Number(offeredPriceRwf) < 0)) return res.status(400).json({ message: 'Offered price must be non-negative.' });
   record.responses.push({ farmerId: req.user._id, message: String(message || '').slice(0, 1000), offeredQuantity: offeredQuantity === undefined ? undefined : Number(offeredQuantity), offeredPriceRwf: offeredPriceRwf === undefined ? undefined : Number(offeredPriceRwf), productId: productId || undefined });
   await record.save();
   res.status(201).json({ data: record });
