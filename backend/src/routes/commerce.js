@@ -96,8 +96,10 @@ router.post('/conversations', auth, asyncRoute(async (req, res) => {
   if (!other) return res.status(404).json({ message: 'Participant not found.' });
   const participants = [req.user._id, other._id].sort((a, b) => String(a).localeCompare(String(b)));
   const contextType = ['general', 'product', 'order', 'demand', 'veterinary'].includes(req.body?.contextType) ? req.body.contextType : 'general';
-  let conversation = await Conversation.findOne({ participantIds: { $all: participants, $size: 2 }, contextType, contextId: req.body?.contextId || null });
-  if (!conversation) conversation = await Conversation.create({ participantIds: participants, contextType, contextId: req.body?.contextId || null });
+  const contextId = req.body?.contextId || null;
+  if (contextId && !validId(contextId)) return res.status(400).json({ message: 'Invalid conversation context.' });
+  let conversation = await Conversation.findOne({ participantIds: { $all: participants, $size: 2 }, contextType, contextId });
+  if (!conversation) conversation = await Conversation.create({ participantIds: participants, contextType, contextId });
   res.status(201).json({ data: conversation });
 }));
 router.get('/conversations', auth, asyncRoute(async (req, res) => {
@@ -132,7 +134,7 @@ router.post('/deliveries', auth, roles('farmer'), asyncRoute(async (req, res) =>
   if (!validId(orderId)) return res.status(400).json({ message: 'A valid order ID is required.' });
   const order = await Order.findOne({ _id: orderId, farmerId: req.user._id, status: 'approved' });
   if (!order) return res.status(404).json({ message: 'Approved order not found.' });
-  const delivery = await Delivery.findOneAndUpdate({ orderId: order._id }, { $setOnInsert: { orderId: order._id, customerId: order.customerId, farmerId: req.user._id, method, deliveryAddress, estimatedAt, notes, events: [{ status: 'pending', note: 'Delivery record created', actorId: req.user._id }] } }, { upsert: true, new: true, runValidators: true });
+  const delivery = await Delivery.findOneAndUpdate({ orderId: order._id }, { $setOnInsert: { orderId: order._id, customerId: order.customerId, farmerId: req.user._id, province: req.user.province || '', district: req.user.district || '', sector: req.user.sector || '', method, deliveryAddress, estimatedAt, notes, events: [{ status: 'pending', note: 'Delivery record created', actorId: req.user._id }] } }, { upsert: true, new: true, runValidators: true });
   res.status(201).json({ data: delivery });
 }));
 router.get('/deliveries', auth, asyncRoute(async (req, res) => {
