@@ -13,27 +13,14 @@ import {
   ProductionExpense,
 } from '../models/ProductionUnit.js';
 import User from '../models/User.js';
+import { authenticate } from '../middleware/auth.js';
+import { canAccessRegion } from '../utils/regionAccess.js';
 
 const router = express.Router();
 
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const auth = asyncRoute(async (req, res, next) => {
-  const [scheme, token] = String(req.headers.authorization || '').split(' ');
-  if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A valid active session is required.' });
-  try {
-    const jwt = await import('jsonwebtoken');
-    const payload = jwt.default.verify(token, process.env.JWT_SECRET || 'ahub-dev-secret');
-    const user = await User.findById(payload.sub);
-    if (!user || user.status !== 'active' || Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) {
-      return res.status(401).json({ message: 'A valid active session is required.' });
-    }
-    req.user = user;
-    next();
-  } catch {
-    res.status(401).json({ message: 'A valid active session is required.' });
-  }
-});
+const auth = authenticate;
 
 const roles = (...allowed) => (req, res, next) => allowed.includes(req.user.portal) ? next() : res.status(403).json({ message: 'This portal cannot perform that action.' });
 
@@ -41,13 +28,7 @@ const data = (res, value, status = 200) => res.status(status).json({ data: value
 const hide = res => res.status(404).json({ message: 'Not found.' });
 
 // Check if user can access sector data
-const canAccessSector = (user, sector, district, province) => {
-  if (user.portal === 'rab') return true;
-  if (user.portal === 'province') return user.province === province;
-  if (user.portal === 'district') return user.district === district;
-  if (user.portal === 'sector') return user.sector === sector;
-  return false;
-};
+const canAccessSector = (user, sector, district, province) => canAccessRegion(user, { sector, district, province });
 
 // Build sector filter based on user role
 const buildSectorFilter = (user) => {

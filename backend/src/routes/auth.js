@@ -11,7 +11,6 @@ import { sendWhatsAppOtp, whatsappStatus } from '../services/whatsapp.js';
 
 const router = express.Router();
 
-const tokenSecret = process.env.JWT_SECRET || 'ahub-dev-secret';
 const tokenExpiry = process.env.JWT_EXPIRES_IN || '7d';
 
 const isOfficialRole = (portal) => !!PORTAL_RULES[portal] && PORTAL_RULES[portal].isOfficial;
@@ -23,7 +22,8 @@ const getAuthenticatedUser = async (req) => {
   if (scheme !== 'Bearer' || !token) return null;
 
   try {
-    const payload = jwt.verify(token, tokenSecret);
+    if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured');
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
     const tokenVersion = Number.isInteger(payload.tokenVersion) ? payload.tokenVersion : 0;
     const user = await User.findById(payload.sub);
 
@@ -57,7 +57,7 @@ const generateToken = (user) =>
       fullName: user.fullName,
       tokenVersion: Number(user.tokenVersion || 0),
     },
-    tokenSecret,
+    (() => { if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured'); return process.env.JWT_SECRET; })(),
     { expiresIn: tokenExpiry }
   );
 
