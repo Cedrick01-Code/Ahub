@@ -13,7 +13,8 @@ export function CommercePanels({ portal, announce }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [activeConversation, setActiveConversation] = useState("")
   const [messageText, setMessageText] = useState("")
-  const [participantId, setParticipantId] = useState("")
+  const [contactQuery, setContactQuery] = useState("")
+  const [contacts, setContacts] = useState<Array<{_id:string;fullName:string;portal:string;sector?:string;district?:string}>>([])
   const [busy, setBusy] = useState(false)
   const [demand, setDemand] = useState({ commodity: "", quantity: "", unit: "kg", province: "", district: "", notes: "" })
   const [price, setPrice] = useState({ commodity: "", category: "crops", unit: "kg", priceRwf: "", effectiveFrom: new Date().toISOString().slice(0, 10), province: "", district: "", status: "published" as "draft" | "published" })
@@ -76,12 +77,22 @@ export function CommercePanels({ portal, announce }: Props) {
     finally { setBusy(false) }
   }
 
-  const startConversation = async (event: FormEvent) => {
-    event.preventDefault(); if (!participantId.trim()) return
+  const searchContacts = async (event: FormEvent) => {
+    event.preventDefault()
+    if (contactQuery.trim().length < 2) return
+    try {
+      const result = await commerceApi.directory(contactQuery.trim())
+      setContacts(result.data || [])
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Contact search failed.")
+    }
+  }
+
+  const startConversation = async (id: string) => {
     setBusy(true)
     try {
-      const result = await commerceApi.openConversation(participantId.trim())
-      setParticipantId(""); await refresh(); await loadMessages(result.data._id)
+      const result = await commerceApi.openConversation(id)
+      setContacts([]); setContactQuery(""); await refresh(); await loadMessages(result.data._id)
     } catch (error) { announce(error instanceof Error ? error.message : "Could not start conversation.") }
     finally { setBusy(false) }
   }
@@ -131,7 +142,8 @@ export function CommercePanels({ portal, announce }: Props) {
 
     <section className={panel} id="independent-messages">
       <div className="mb-3"><h2 className="font-bold text-slate-900">Messages inbox</h2><p className="text-xs text-slate-500">Conversations work independently of orders.</p></div>
-      <form onSubmit={startConversation} className="mb-3 flex gap-2"><input className={field} value={participantId} onChange={e => setParticipantId(e.target.value)} placeholder="Start conversation · recipient user ID"/><button disabled={busy} className="shrink-0 rounded-xl bg-emerald-700 px-3 text-xs font-bold text-white">Start</button></form>
+      <form onSubmit={searchContacts} className="mb-3 flex gap-2"><input className={field} value={contactQuery} onChange={e => setContactQuery(e.target.value)} placeholder="Find a farmer or customer by name"/><button disabled={busy || contactQuery.trim().length < 2} className="shrink-0 rounded-xl bg-emerald-700 px-3 text-xs font-bold text-white">Find people</button></form>
+      {contacts.length > 0 && <div className="mb-3 space-y-1 rounded-xl border border-slate-200 p-2">{contacts.map(contact => <button key={contact._id} onClick={() => void startConversation(contact._id)} className="flex w-full items-center justify-between rounded-lg p-2 text-left text-sm hover:bg-emerald-50"><span><b>{contact.fullName}</b><span className="ml-2 text-xs capitalize text-slate-500">{contact.portal}</span></span><span className="text-xs text-slate-500">{[contact.sector,contact.district].filter(Boolean).join(", ")}</span></button>)}</div>}
       <div className="grid gap-3 md:grid-cols-2"><div className="max-h-64 space-y-2 overflow-y-auto">{conversations.map(c => <button key={c._id} onClick={() => void loadMessages(c._id)} className={"w-full rounded-xl border p-3 text-left text-sm "+(activeConversation===c._id?"border-emerald-500 bg-emerald-50":"border-slate-200")}><b>{c.participantIds.map(p => typeof p==="object"?p.fullName:"Participant").join(", ")}</b><p className="truncate text-xs text-slate-500">{c.lastMessagePreview || "No messages yet"}</p></button>)}{!conversations.length && <p className="text-xs text-slate-500">No conversations yet.</p>}</div>
         <div className="flex min-h-48 flex-col rounded-xl border border-slate-200 p-3"><div className="mb-2 flex-1 space-y-2 overflow-y-auto">{messages.map(m => <p key={m._id} className="rounded-lg bg-slate-50 p-2 text-sm">{m.body}</p>)}{activeConversation && !messages.length && <p className="text-xs text-slate-500">No messages in this conversation yet.</p>}</div><form onSubmit={sendMessage} className="flex gap-2"><input className={field} value={messageText} onChange={e => setMessageText(e.target.value)} placeholder="Write a message..." disabled={!activeConversation}/><button disabled={busy || !activeConversation} className="rounded-xl bg-emerald-700 px-3 text-white"><span className="sr-only">Send</span>➤</button></form></div>
       </div>
